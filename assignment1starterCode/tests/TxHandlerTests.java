@@ -23,4 +23,13 @@ public class TxHandlerTests {
         Assert.assertTrue(Crypto.verifySignature(publicKey, MESSAGE.getBytes(), signature));
         Assert.assertFalse(Crypto.verifySignature(publicKey, "FALSE".getBytes(), signature));
     }
+
+    @Test
+    public void testUTXOPool() {
+        UTXOPool utxoPool = new UTXOPool();
+
+
+
+        Assert.assertTrue(true);
+    }
 }
