@@ -1,4 +1,6 @@
+import java.security.PublicKey;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public class TxHandler {
     UTXOPool utxoPool;
@@ -9,7 +11,7 @@ public class TxHandler {
      */
     public TxHandler(UTXOPool utxoPool) {
         // IMPLEMENT THIS
-        this.utxoPool = new UTXOPool((utxoPool));
+        this.utxoPool = new UTXOPool(utxoPool);
     }
 
     /**
@@ -26,6 +28,9 @@ public class TxHandler {
 
         double sumOutputs = 0;
         double sumInputs = 0;
+        HashSet<UTXO> doubleCheck = new HashSet();
+        int index = 0;
+
         for(Transaction.Output txOutput : tx.getOutputs()) {
             if (txOutput.value < 0) {
                 return false;
@@ -33,8 +38,28 @@ public class TxHandler {
             sumOutputs += txOutput.value;
         }
 
+        for(Transaction.Input txInput : tx.getInputs()) {
+            UTXO utxo = new UTXO(txInput.prevTxHash, txInput.outputIndex);
 
-        return false;
+            Transaction.Output txOutput = this.utxoPool.getTxOutput(utxo);
+            if (txOutput == null || doubleCheck.contains(utxo)) {
+                return false;
+            }
+            doubleCheck.add(utxo);
+
+            byte[] rawDataToSign = tx.getRawDataToSign(index);
+            PublicKey publicKey = txOutput.address;
+            if (!Crypto.verifySignature(publicKey, rawDataToSign, txInput.signature)) {
+                return false;
+            }
+            sumInputs += txOutput.value;
+            index++;
+        }
+        if (sumOutputs > sumInputs) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -44,8 +69,26 @@ public class TxHandler {
      */
     public Transaction[] handleTxs(Transaction[] possibleTxs) {
         // IMPLEMENT THIS
-        Transaction[] txList = {};
-        return txList;
+        ArrayList<Transaction> txList = new ArrayList<>();
+
+        for(Transaction tx : possibleTxs) {
+            if (!isValidTx(tx)) {
+                continue;
+            }
+            txList.add(tx);
+
+            for(Transaction.Input txInput : tx.getInputs()) {
+                UTXO utxo = new UTXO(txInput.prevTxHash, txInput.outputIndex);
+                this.utxoPool.removeUTXO(utxo);
+            }
+
+            int i = 0;
+            byte[] txHash = tx.getHash();
+            for(Transaction.Output txOutput : tx.getOutputs()) {
+                this.utxoPool.addUTXO(new UTXO(txHash, i++), txOutput);
+            }
+        }
+        return txList.toArray(new Transaction[txList.size()]);
     }
 
 }
